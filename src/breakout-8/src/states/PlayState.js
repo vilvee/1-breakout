@@ -8,6 +8,8 @@ import {
 	TILE_SIZE
 } from "../globals.js";
 import State from "./State.js";
+import PowerUp from "../PowerUp.js";
+import Ball from "../Ball.js";
 
 /**
  * Represents the state of the game in which we are actively playing;
@@ -21,6 +23,8 @@ export default class PlayState extends State {
 		super();
 
 		this.baseScore = 10;
+		this.balls = [];
+		this.powerUps = [];
 	}
 
 	enter(parameters) {
@@ -29,8 +33,11 @@ export default class PlayState extends State {
 		this.health = parameters.health;
 		this.score = parameters.score;
 		this.ball = parameters.ball;
+		this.balls = [];
+		this.balls.push(this.ball);
 		this.userInterface = parameters.userInterface;
 		this.level = parameters.level;
+		this.powerUps = [];
 	}
 
 	checkVictory() {
@@ -64,46 +71,64 @@ export default class PlayState extends State {
 			return;
 		}
 
-		if (this.ball.didCollide(this.paddle)) {
-			// Flip y velocity and reset position to on top of the paddle.
-			this.ball.dy *= -1;
-			this.ball.y = CANVAS_HEIGHT - TILE_SIZE * 2 - TILE_SIZE / 2;
+		this.balls.forEach((ball) => {
+			if (ball.didCollide(this.paddle)) {
+				// Flip y velocity and reset position to on top of the paddle.
+				ball.dy *= -1;
+				ball.y = CANVAS_HEIGHT - TILE_SIZE * 2 - TILE_SIZE / 2;
 
-			// Vary the angle of the ball depending on where it hit the paddle.
-			this.ball.handlePaddleCollision(this.paddle);
+				// Vary the angle of the ball depending on where it hit the paddle.
+				ball.handlePaddleCollision(this.paddle);
+				sounds.paddleHit.play();
+			};
 
-			sounds.paddleHit.play();
+			this.bricks.forEach((brick) => {
+				if (brick.inPlay && ball.didCollide(brick)) {
+					this.score += this.baseScore * (brick.tier + 1);
+
+					// Update the paddle size based on the new score
+					this.paddle.updateSize(this.score);
+
+					// Update the UI to reflect the new score
+					this.userInterface.update(this.health, this.score);
+
+					// Call the brick's hit function, which removes it from play.
+					brick.hit();
+
+					// Randomly spawn a power-up when brick is hit
+					if (this.powerUps.length < 3 && Math.random() < 1) { // Limit to 3 active power-ups
+						const newPowerUp = new PowerUp(brick.x, brick.y);
+						this.powerUps.push(newPowerUp);
+					}
+
+					if (this.checkVictory()) {
+						sounds.victory.play();
+
+						stateMachine.change('victory', {
+							level: this.level,
+							paddle: this.paddle,
+							health: this.health,
+							score: this.score,
+							ball: ball,
+							userInterface: this.userInterface,
+						});
+					}
+
+					this.ball.handleBrickCollision(brick);
+				}
+			});
+
+		if(ball.didFall()){
+			this.balls.splice(this.balls.indexOf(ball), 1);
 		}
 
-		this.bricks.forEach((brick) => {
-			if (brick.inPlay && this.ball.didCollide(brick)) {
-				this.score += this.baseScore * (brick.tier + 1);
-				this.userInterface.update(this.health, this.score);
-
-				// Call the brick's hit function, which removes it from play.
-				brick.hit();
-
-				if (this.checkVictory()) {
-					sounds.victory.play();
-
-					stateMachine.change('victory', {
-						level: this.level,
-						paddle: this.paddle,
-						health: this.health,
-						score: this.score,
-						ball: this.ball,
-						userInterface: this.userInterface,
-					});
-				}
-
-				this.ball.handleBrickCollision(brick);
-			}
-		});
-
-		if (this.ball.didFall()) {
+		if (ball.didFall() && this.balls.length < 1) {
 			this.health--;
 			this.userInterface.update(this.health, this.score);
 			sounds.hurt.play();
+
+
+			this.paddle.shrinkOnLifeLoss();
 
 			if (this.health === 0) {
 				stateMachine.change('game-over', {
@@ -113,7 +138,7 @@ export default class PlayState extends State {
 			else {
 				stateMachine.change('serve', {
 					paddle: this.paddle,
-					ball: this.ball,
+					ball: ball,
 					bricks: this.bricks,
 					health: this.health,
 					score: this.score,
@@ -122,21 +147,69 @@ export default class PlayState extends State {
 				});
 			}
 		}
+	});
 
 		this.paddle.update(dt);
-		this.ball.update(dt);
+		this.balls.forEach((ball) => {
+			ball.update(dt);
+		});
+
+
+		for (let i = this.powerUps.length - 1; i >= 0; i--) {
+			const powerUp = this.powerUps[i];
+			powerUp.update(dt); // Make the power-up fall
+
+			// Check if the power-up collides with the paddle
+			if (powerUp.didCollide(this.paddle)) {
+				this.activatePowerUp(powerUp);
+				this.powerUps.splice(i, 1);
+			}
+
+			// Power-up falls off the screen
+			if (powerUp.didFall()) {
+				this.powerUps.splice(i, 1);
+			}
+		}
+
 		this.bricks.forEach((brick) => {
 			brick.update(dt);
 		});
+
+
+
 	}
+
+	activatePowerUp(powerUp) {
+		if (powerUp.type === 'multi-ball') {
+			const ball1 = new Ball();
+			const ball2 = new Ball();
+			ball1.x = this.ball.x;
+			ball1.y = this.ball.y;
+
+			ball1.x = this.ball.x;
+			ball1.y = this.ball.y;
+
+			// Add the new balls to the balls array
+			this.balls.push(ball1, ball2);
+		}
+	}
+
+
 
 	render() {
 		this.userInterface.render();
 		this.paddle.render();
-		this.ball.render();
+
+		this.balls.forEach((ball) => {
+			ball.render();
+		});
 
 		this.bricks.forEach((brick) => {
 			brick.render();
+		});
+
+		this.powerUps.forEach((powerUp) => {
+			powerUp.render();
 		});
 
 		if (this.paused) {

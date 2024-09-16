@@ -5,7 +5,6 @@ import {
 	TILE_SIZE
 } from "./globals.js";
 import SpriteManager from "./SpriteManager.js";
-
 /**
  * Represents a paddle that can move left and right. Used in the main
  * program to deflect the ball toward the bricks; if the ball passes
@@ -42,6 +41,30 @@ export default class Paddle {
 		this.paddleSpeed = 500;
 
 		this.sprites = SpriteManager.generatePaddleSprites();
+	}
+
+
+	updateSize(score) {
+		if (score >= 200) {
+			this.size = 3;
+		} else if (score >= 100) {
+			this.size = 2;
+		} else {
+			this.size = 1;
+		}
+		this.updatePaddleWidth();
+	}
+
+	shrinkOnLifeLoss() {
+		if (this.size > 0) {
+			this.size--;
+			this.updatePaddleWidth();
+		}
+	}
+
+	updatePaddleWidth() {
+		const paddleWidths = [TILE_SIZE * 2, TILE_SIZE * 3, TILE_SIZE * 4, TILE_SIZE * 5];
+		this.width = paddleWidths[this.size];  //index fetches the size of the paddle
 	}
 
 	update(dt) {

@@ -12,6 +12,7 @@ import { CANVAS_HEIGHT, CANVAS_WIDTH, context, images, keys, stateMachine } from
 export default class ServeState extends State {
 	constructor() {
 		super();
+
 	}
 
 	enter(parameters) {

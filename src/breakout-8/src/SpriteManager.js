@@ -110,4 +110,23 @@ export default class SpriteManager {
 
 		return sprites;
 	}
+
+	/**
+	 * Retrieves all power-up sprites from the sprite sheet.
+	 *
+	 * @returns An array of power-up sprites.
+	 */
+	static generatePowerUpSprites() {
+		let x = TILE_SIZE * 8;
+		let y = TILE_SIZE * 12;
+		const sprites = [];
+
+		for (let i = 0; i < 2; i++) {
+			sprites.push(new Sprite(images.spriteSheet, x, y, TILE_SIZE, TILE_SIZE));
+			x += TILE_SIZE;
+		}
+
+   		return sprites;
+	}
+
 }
